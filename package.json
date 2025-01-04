@@ -13,9 +13,29 @@
     "xlsx": "^0.18.5"
   },
   "scripts": {
-    "dev": "nodemon App.js",   
-    "start": "node server.js",    
-    "build": "echo 'Nothing to build'", 
-        "vercel-build": "npm run build  "
-    }
+    "start": "node server.js",
+    "dev": "nodemon server.js",
+    "client": "react-scripts start",
+    "build": "react-scripts build",
+    "test": "react-scripts test",
+    "eject": "react-scripts eject"
+  },
+  "eslintConfig": {
+    "extends": [
+      "react-app",
+      "react-app/jest"
+    ]
+  },
+  "browserslist": {
+    "production": [
+      ">0.2%",
+      "not dead",
+      "not op_mini all"
+    ],
+    "development": [
+      "last 1 chrome version",
+      "last 1 firefox version",
+      "last 1 safari version"
+    ]
+  }
 }
