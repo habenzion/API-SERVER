@@ -1,6 +1,4 @@
 import React, { useState, useEffect } from 'react';
-import * as XLSX from 'xlsx';
-import axios from 'axios';
 import './ExcelConverter.css';
 
 function ExcelConverter() {
@@ -10,65 +8,65 @@ function ExcelConverter() {
   const [fields, setFields] = useState([]);
 
   useEffect(() => {
-    const fetchExcel = async () => {
+    const fetchData = async () => {
       try {
-        const fileId = '15Sh8QPFF_r-oY9qtUPiSPpDBQlhXtn_y';
-        const exportUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
-
-        const response = await axios.get(exportUrl, {
-          responseType: 'arraybuffer',
-          headers: {
-            'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
-          }
-        });
-
-        const workbook = XLSX.read(response.data, { type: 'array' });
-        const firstSheetName = workbook.SheetNames[0];
-        const worksheet = workbook.Sheets[firstSheetName];
+        const response = await fetch('http://localhost:5000/api/excel-data');
+        const result = await response.json();
         
-        // Get all data including empty cells
-        const result = XLSX.utils.sheet_to_json(worksheet, { 
-          header: 1,
-          raw: false,
-          defval: ''
-        });
+        if (!result.success) {
+          throw new Error(result.error);
+        }
 
-        // Filter out completely empty rows
-        const filteredResult = result.filter(row => row.some(cell => cell !== ''));
-        
-        // Extract headers (first row)
-        const headers = filteredResult[0];
-        setFields(headers);
-
-        // Convert remaining rows to objects with all fields
-        const data = filteredResult.slice(1).map(row => {
-          const obj = {};
-          headers.forEach((header, index) => {
-            // Preserve empty strings instead of converting to null/undefined
-            obj[header] = row[index] || '';
-          });
-          return obj;
-        });
-
-        setJsonData(data);
+        setJsonData(result.data);
+        setFields(result.fields);
         setLoading(false);
       } catch (err) {
-        setError('Error fetching or processing Excel file: ' + err.message);
+        setError('Error fetching data: ' + err.message);
         setLoading(false);
       }
     };
 
-    fetchExcel();
+    fetchData();
   }, []);
 
   const renderFieldsList = () => {
-
+    return (
+      <div className="fields-list">
+        <h3>Available Fields:</h3>
+        <ul>
+          {fields.map((field, index) => (
+            <li key={index}>{field}</li>
+          ))}
+        </ul>
+      </div>
+    );
   };
 
   const renderDataTable = () => {
     if (!jsonData || jsonData.length === 0) return null;
 
-  
+    return (
+      <div className="data-table-container">
+        <table className="data-table">
+          <thead>
+            <tr>
+              {fields.map((field, index) => (
+                <th key={index}>{field}</th>
+              ))}
+            </tr>
+          </thead>
+          <tbody>
+            {jsonData.map((row, rowIndex) => (
+              <tr key={rowIndex}>
+                {fields.map((field, colIndex) => (
+                  <td key={colIndex}>{row[field]}</td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+    );
   };
 
   return (
