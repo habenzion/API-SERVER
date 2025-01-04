@@ -6,19 +6,19 @@ const XLSX = require('xlsx');
 const app = express();
 const port = process.env.PORT || 5000;
 
-// Enable CORS
 app.use(cors());
 app.use(express.json());
 
-// Cache mechanism
 let cachedData = null;
 let lastFetchTime = null;
-const CACHE_DURATION = 5 * 60 * 1000; // 5 minutes cache
+const CACHE_DURATION = 5 * 60 * 1000;
 
 async function fetchAndParseExcel() {
   try {
     const fileId = '15Sh8QPFF_r-oY9qtUPiSPpDBQlhXtn_y';
-    const exportUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx&id=${fileId}`;
+    const exportUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
+
+    console.log('Fetching Excel file from:', exportUrl);
 
     const response = await axios.get(exportUrl, {
       responseType: 'arraybuffer',
@@ -31,27 +31,20 @@ async function fetchAndParseExcel() {
     const firstSheetName = workbook.SheetNames[0];
     const worksheet = workbook.Sheets[firstSheetName];
     
-    const result = XLSX.utils.sheet_to_json(worksheet, { 
-      header: 1,
-      raw: false,
-      defval: ''
+    // Get raw data with headers
+    const rawData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: true,
+      defval: null
     });
 
-    const filteredResult = result.filter(row => row.some(cell => cell !== ''));
-    const headers = filteredResult[0];
-    
-    const data = filteredResult.slice(1).map(row => {
-      const obj = {};
-      headers.forEach((header, index) => {
-        obj[header] = row[index] || '';
-      });
-      return obj;
-    });
+    console.log('Total Records:', rawData.length);
+    console.log('Sample Record:', rawData[0]);
 
     return {
-      data,
-      headers,
-      totalRows: data.length
+      success: true,
+      timestamp: new Date().toISOString(),
+      total_records: rawData.length,
+      data: rawData
     };
   } catch (error) {
     console.error('Excel fetch error:', error);
@@ -59,25 +52,76 @@ async function fetchAndParseExcel() {
   }
 }
 
-// API Routes
+// Main data endpoint
 app.get('/api/data', async (req, res) => {
   try {
     if (cachedData && lastFetchTime && (Date.now() - lastFetchTime < CACHE_DURATION)) {
       return res.json(cachedData);
     }
 
-    const { data, headers, totalRows } = await fetchAndParseExcel();
+    const data = await fetchAndParseExcel();
+    cachedData = data;
+    lastFetchTime = Date.now();
+    res.json(data);
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
+// Get specific field values
+app.get('/api/data/:field', async (req, res) => {
+  try {
+    const field = req.params.field;
+    const data = await fetchAndParseExcel();
     
-    cachedData = {
+    const fieldValues = data.data
+      .map(item => item[field])
+      .filter(value => value !== null && value !== undefined);
+    
+    res.json({
       success: true,
       timestamp: new Date().toISOString(),
-      total_records: totalRows,
-      fields: headers,
-      data: data
-    };
-    
+      field,
+      values: fieldValues,
+      total_values: fieldValues.length
+    });
+  } catch (error) {
+    res.status(500).json({
+      success: false,
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
+// Health check endpoint
+app.get('/api/health', (req, res) => {
+  res.json({
+    status: 'healthy',
+    timestamp: new Date().toISOString(),
+    cache: {
+      isCached: !!cachedData,
+      lastUpdate: lastFetchTime ? new Date(lastFetchTime).toISOString() : null,
+      timeToExpiry: lastFetchTime ? CACHE_DURATION - (Date.now() - lastFetchTime) : null
+    }
+  });
+});
+
+// Force cache refresh
+app.post('/api/refresh', async (req, res) => {
+  try {
+    const data = await fetchAndParseExcel();
+    cachedData = data;
     lastFetchTime = Date.now();
-    res.json(cachedData);
+    res.json({
+      success: true,
+      message: 'Cache refreshed successfully',
+      timestamp: new Date().toISOString()
+    });
   } catch (error) {
     res.status(500).json({
       success: false,
@@ -89,4 +133,9 @@ app.get('/api/data', async (req, res) => {
 
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
+  console.log('\nAvailable endpoints:');
+  console.log('- GET  /api/data          : Get all Excel data');
+  console.log('- GET  /api/raw           : Get raw Excel data');
+  console.log('- GET  /api/health        : Check server health');
+  console.log('- POST /api/refresh       : Force refresh cache');
 }); 
