@@ -14,6 +14,7 @@
   },
   "scripts": {
     "start": "node src/server.js",
-    "dev": "nodemon src/server.js"
+    "dev": "nodemon src/server.js",
+     "vercel-build": "zenstack generate && tsc && prisma db push && tsx prisma/seed.ts" 
   }
 }

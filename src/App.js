@@ -1,13 +1,12 @@
 import React from 'react';
 import './App.css';
-import ExcelConverter from './components/ExcelConverter';
+import BlankPage from './components/BlankPage';
 
 function App() {
   return (
     <div className="App">
-
       <main>
-        <ExcelConverter />
+        <BlankPage />
       </main>
     </div>
   );
