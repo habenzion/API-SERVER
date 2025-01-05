@@ -131,6 +131,56 @@ app.post('/api/refresh', async (req, res) => {
   }
 });
 
+// Add this new endpoint for ads
+app.get('/api/ads', async (req, res) => {
+  try {
+    const fileId = '1B1RcfrX1_w7i1yHnPnjM724dLY7n6xiL';
+    const exportUrl = `https://docs.google.com/spreadsheets/d/${fileId}/export?format=xlsx`;
+
+    console.log('Fetching Ads Excel file from:', exportUrl);
+
+    const response = await axios.get(exportUrl, {
+      responseType: 'arraybuffer',
+      headers: {
+        'Content-Type': 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet'
+      }
+    });
+
+    const workbook = XLSX.read(response.data, { type: 'array' });
+    const firstSheetName = workbook.SheetNames[0];
+    const worksheet = workbook.Sheets[firstSheetName];
+    
+    // Get raw data with headers
+    const rawData = XLSX.utils.sheet_to_json(worksheet, {
+      raw: true,
+      defval: null
+    });
+
+    // Transform the data into the required format
+    const formattedAds = rawData.map((row, index) => ({
+      title: row.Title || row.title || '',
+      message: row.Message || row.message || row.Description || row.description || '',
+      imageUrl: row.ImageUrl || row.imageUrl || row.IconUrl || row.iconUrl || 
+                `https://picsum.photos/200/300?random=${index}`,
+      actionLink: row.ActionLink || row.actionLink || row.Link || row.link || '#',
+      actionText: row.ActionText || row.actionText || row.Button || row.button || 'Learn More'
+    })).filter(ad => ad.title || ad.message); // Filter out empty entries
+
+    console.log('Total Ads:', formattedAds.length);
+    console.log('Sample Ad:', formattedAds[0]);
+
+    res.json(formattedAds);
+
+  } catch (error) {
+    console.error('Ads fetch error:', error);
+    res.status(500).json({
+      success: false,
+      timestamp: new Date().toISOString(),
+      error: error.message
+    });
+  }
+});
+
 app.listen(port, () => {
   console.log(`Server running on port ${port}`);
   console.log('\nAvailable endpoints:');
